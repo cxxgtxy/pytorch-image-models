@@ -33,7 +33,7 @@ _models = [
     'mobilenetv3_050', 'mobilenetv3_075', 'mobilenetv3_100', 'chamnetv1_100', 'chamnetv2_100',
     'fbnetc_100', 'spnasnet_100', 'tflite_mnasnet_100', 'tflite_semnasnet_100', 'efficientnet_b0',
     'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'tf_efficientnet_b0',
-    'tf_efficientnet_b1', 'tf_efficientnet_b2', 'tf_efficientnet_b3']
+    'tf_efficientnet_b1', 'tf_efficientnet_b2', 'tf_efficientnet_b3', 'proxyless_mobile_100']
 __all__ = ['GenEfficientNet', 'gen_efficientnet_model_names'] + _models
 
 
@@ -66,6 +66,7 @@ default_cfgs = {
     'mobilenetv3_050': _cfg(url=''),
     'mobilenetv3_075': _cfg(url=''),
     'mobilenetv3_100': _cfg(url=''),
+    'proxyless_mobile_100': _cfg(url=''),
     'chamnetv1_100': _cfg(url=''),
     'chamnetv2_100': _cfg(url=''),
     'fbnetc_100': _cfg(url='https://www.dropbox.com/s/0ku2tztuibrynld/fbnetc_100-f49a0c5f.pth?dl=1'),
@@ -770,6 +771,38 @@ class GenEfficientNet(nn.Module):
         return self.classifier(x)
 
 
+def _gen_proxyless_mobile(channel_multiplier, num_classes=1000, **kwargs):
+    arch_def = [
+        # stage 0, 112x112 in
+        ['ds_r1_k3_s1_c16_noskip'],
+        # stage 1, 112x112 in
+        ['ir_r1_k3_s2_e3_c32', 'ir_r1_k3_s1_e3_c32'],
+        # stage 2, 56x56 in
+        ['ir_r1_k7_s2_e3_c40', 'ir_r1_k3_s1_e3_c40', 'ir_r2_k5_s1_e3_c40'],
+        # stage 3, 28x28 in
+        ['ir_r1_k7_s2_e6_c80', 'ir_r3_k5_s1_e3_c80', 'ir_r1_k5_s1_e6_c96', 'ir_r3_k5_s1_e3_c96'],
+        # stage 4, 14x14in
+        ['ir_r2_k7_s2_e6_c192'],
+        # stage 5, 14x14in
+        ['ir_r2_k7_s1_e3_c192'],
+        # stage 6, 7x7 in
+        ['ir_r1_k7_s1_e6_c320_noskip']
+    ]
+    bn_momentum, bn_eps = _resolve_bn_params(kwargs)
+    model = GenEfficientNet(
+        _decode_arch_def(arch_def),
+        num_classes=num_classes,
+        stem_size=32,
+        channel_multiplier=channel_multiplier,
+        channel_divisor=8,
+        channel_min=None,
+        bn_momentum=bn_momentum,
+        bn_eps=bn_eps,
+        **kwargs
+    )
+    return model
+
+
 def _gen_mnasnet_a1(channel_multiplier, num_classes=1000, **kwargs):
     """Creates a mnasnet-a1 model.
 
@@ -1336,6 +1369,22 @@ def mobilenetv3_100(num_classes, in_chans=3, pretrained=False, **kwargs):
     """ MobileNet V3 """
     default_cfg = default_cfgs['mobilenetv3_100']
     model = _gen_mobilenet_v3(1.0, num_classes=num_classes, in_chans=in_chans, **kwargs)
+    model.default_cfg = default_cfg
+    if pretrained:
+        load_pretrained(model, default_cfg, num_classes, in_chans)
+    return model
+
+def proxyless_mobile_100(num_classes, in_chans=3, pretrained=False, **kwargs):
+    """
+    proxyless moblie
+    :param num_classes: 
+    :param in_chans: 
+    :param pretrained: 
+    :param kwargs: 
+    :return: 
+    """
+    default_cfg = default_cfgs['proxyless_mobile_100']
+    model = _gen_proxyless_mobile(1.0, num_classes=num_classes, in_chans=in_chans, **kwargs)
     model.default_cfg = default_cfg
     if pretrained:
         load_pretrained(model, default_cfg, num_classes, in_chans)
