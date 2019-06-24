@@ -190,6 +190,8 @@ def main():
     else:
         if args.distributed and args.sync_bn and has_apex:
             model = convert_syncbn_model(model)
+        else:
+            model = nn.DataParallel(model)
         model.cuda()
 
     optimizer = create_optimizer(args, model)
@@ -251,7 +253,7 @@ def main():
         collate_fn=collate_fn,
     )
 
-    eval_dir = os.path.join(args.data, 'validation')
+    eval_dir = os.path.join(args.data, 'valid')
     if not os.path.isdir(eval_dir):
         print('Error: validation folder does not exist at: %s' % eval_dir)
         exit(1)
